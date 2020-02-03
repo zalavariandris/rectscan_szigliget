@@ -28,11 +28,12 @@ class GraphicsViewport(QGraphicsView):
 
     def wheelEvent(self, event):
         zoomSpeed = 0.001
-        if event.pixelDelta().y() > 0:
-            zoomFactor = 1+event.pixelDelta().y()*zoomSpeed
+        delta = event.angleDelta().y() # consider implementing pixelDelta for macs
+        if delta > 0:
+            zoomFactor = 1+delta*zoomSpeed
             self.scale(zoomFactor, zoomFactor)
         else:
-            zoomFactor = 1+event.pixelDelta().y()*zoomSpeed
+            zoomFactor = 1+delta*zoomSpeed
             self.scale(zoomFactor, zoomFactor)
 
 
