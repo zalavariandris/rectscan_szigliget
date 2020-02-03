@@ -11,6 +11,21 @@ class GraphicsViewport(QGraphicsView):
         self.setSceneRect(-5000, -5000, 10000, 10000)
         self.setDragMode(QGraphicsView.ScrollHandDrag)
 
+        for gesture in [Qt.TapGesture, Qt.TapAndHoldGesture, Qt.PanGesture, Qt.PinchGesture, Qt.SwipeGesture, Qt.CustomGesture]:
+            self.grabGesture(gesture)
+
+    def event(self, event):
+        if event.type() == QEvent.Gesture:
+            return self.gestureEvent(event)
+        return super().event(event)
+
+    def gestureEvent(self, event):
+        pinch = event.gesture(Qt.PinchGesture)
+        if pinch:
+            print(pinch.scaleFactor())
+            self.scale(pinch.scaleFactor(), pinch.scaleFactor())
+        return True
+
     def wheelEvent(self, event):
         zoomSpeed = 0.001
         if event.pixelDelta().y() > 0:
