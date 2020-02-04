@@ -40,6 +40,39 @@ class GraphicsViewport(QGraphicsView):
             self.scale(zoomFactor, zoomFactor)
 
 
+class SliderLabel(QWidget):
+    valueChanged = pyqtSignal(int)
+    def __init__(self, text, value=None, parent=None):
+        super().__init__(parent=parent)
+        self.text = text
+        self.slider = QSlider(orientation=Qt.Horizontal, maximum=100)
+        self.slider.setTracking(True)
+
+        if value:
+            self.slider.setValue(int(value))
+
+        self.label = QLabel("{} {}".format(text, self.value()))
+
+        self.setLayout(QHBoxLayout())
+        self.layout().addWidget(self.slider)
+        self.layout().addWidget(self.label)
+
+        self.slider.valueChanged.connect(lambda val: self.valueChanged.emit(val))
+        self.valueChanged.connect(self.updateLabel)
+
+    def value(self):
+        return self.slider.value()
+
+    def updateLabel(self):
+        self.label.setText("{} {}".format(self.text, self.value()))
+
+    def setValue(self, value):
+        self.slider.blockSignals(True)
+        self.slider.setValue(value)
+        self.slider.blockSignals(False)
+        self.valueChanged.emit(value)
+
+
 class BaseWindow(QSplitter):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -64,133 +97,63 @@ class BaseWindow(QSplitter):
         self.setStretchFactor(0,0)
         self.setStretchFactor(1,1)
 
-        # attributes dictionary
-        self._attributes = {}
-
     def sizeHint(self):
         return QSize(1024, 768)
 
-    def addAttribute(self, name):
-        # add ui for an attribute
-        slider = self.addSlider(name, defaultValue=self.settings.value(name, 50))
-        def updateSettings(value, name=name):
-            self.settings.setValue(name, value)
-            self.settings.sync()
-
-        slider.valueChanged.connect(updateSettings)
-        self._attributes[name] = {'slider': slider}
-        return slider
-
-    def addSlider(self, name, defaultValue=None):
-        print("add slider:", name, defaultValue)
-        label = QLabel("{} {}".format(name, defaultValue))
-        slider = QSlider(orientation=Qt.Horizontal, maximum=1000)
-        slider.setTracking(True)
-
-        if defaultValue:
-            slider.setValue(int(defaultValue))
-
-        def syncLabel(value):
-            label.setText("{} {}".format(name, value))
-
-        slider.valueChanged.connect(syncLabel)
-
-        widget = QWidget()
-        widget.setLayout(QHBoxLayout())
-        widget.layout().addWidget(slider)
-        widget.layout().addWidget(label)
-        self.inspector.layout().addWidget(widget)
-        return slider
-
 
 class QGraphicsLayerItem(QGraphicsItem):
-    pass
+    def boundingRect(self):
+        return self.childrenBoundingRect()
 
-class Window(BaseWindow):
+    def paint(self, painter, option, widget):
+        pass
+
+
+class CorridorItem(QGraphicsRectItem):
     def __init__(self, parent=None):
-        super().__init__(parent=parent)
-
-        self.rectangles = []
-        self.baseRect = QRectF(0,0, 210, 297) #A4
-        self.page_rect = QRectF(0,0, 420*2, 594*2) #A2
-        self.pen = QPen(
-            QBrush(QColor(0,0,0)),
-            0.1, # width,
-            Qt.SolidLine,
-            Qt.SquareCap,
-            Qt.RoundJoin
-            )
-
-        # page setup
-
-        # attributes
-        self.addAttribute('length').valueChanged.connect(self.updateRectangles)
-        self.addAttribute('count').valueChanged.connect(self.updateRectangles)
-        self.addAttribute('k').valueChanged.connect(self.updateRectangles)
-        self.addAttribute('horizont').valueChanged.connect(self.updateRectangles)
-
-        # actions
-        self.exportButton = QPushButton("export")
-        self.exportButton.clicked.connect(self.export)
-        self.inspector.layout().addWidget(self.exportButton)
-
-        self.packButton = QPushButton("pack")
-        self.packButton.clicked.connect(self.pack)
-        self.inspector.layout().addWidget(self.packButton)
-
-        #
-        self.rectangles_layer = QGraphicsLayerItem()
-        self.scene.addItem(self.rectangles_layer)
-
-        # page
-        page_selector = QComboBox()
-        page_selector.addItem("A2")
-        page_selector.addItem("A3")
-        page_selector.addItem("A4")
-        page_selector.addItem("A5")
-        self.inspector.layout().addWidget(page_selector)
-        pageItem = QGraphicsRectItem(self.page_rect)
-        pageItem.setBrush(QColor(255,255,255))
-        pageItem.setPen(QPen(Qt.NoPen))
-        pageItem.setZValue(-1)
-        self.scene.addItem(pageItem)
-
-        def update_page(i):
-            page = page_selector.itemText(i)
-            print("update page item size", page)
-            if page == "A2":
-                self.page_rect = QRectF(0,0, 420, 594)
-            if page == "A3":
-                self.page_rect = QRectF(0,0, 297, 420)
-            elif page == "A4":
-                self.page_rect = QRectF(0,0, 210, 297)
-            elif page == "A5":
-                self.page_rect = QRectF(0,0, 148, 210)
-
-            pageItem.setRect(self.page_rect)
-        page_selector.currentIndexChanged.connect(update_page)
-
-        # init rectangles
-        self.updateRectangles()
-
-    @property
-    def count(self):
-        return self._attributes['count']['slider'].value()
+        super().__init__()
+        self.count = 20
+        self.length = 1000
+        self.k = 600
+        self.horizont = 0.5
 
     @property
     def length(self):
-        return self._attributes['length']['slider'].value()
+        return self._length
+
+    @length.setter
+    def length(self, value):
+        self._length = value
+        self.update()
+
+    @property
+    def count(self):
+        return self._count
+
+    @count.setter
+    def count(self, value):
+        self._count = value
+        self.update()
 
     @property
     def k(self):
-        return self._attributes['k']['slider'].value()
+        return self._k
+
+    @k.setter
+    def k(self, value):
+        self._k = value
+        self.update()
 
     @property
     def horizont(self):
-        return self._attributes['horizont']['slider'].value() / 1000
+        return self._horizont
 
-    def updateRectangles(self):
-        # calc persp rectangles
+    @horizont.setter
+    def horizont(self, value):
+        self._horizont = value
+        self.update()
+
+    def doors(self):
         def scaledRect(rect, factor, center=(0.5, 0.5)):
             # 
             left, top, width, height = rect.top(), rect.left(), rect.width(), rect.height()
@@ -205,41 +168,143 @@ class Window(BaseWindow):
 
         try:
             scales = [1/(1+distance/self.count*self.length/self.k) for distance in range(self.count)]
-            self.rectangles = [(scaledRect(self.baseRect, scale, center=(0.5, self.horizont))) for scale in scales]
-
-            # clear rectangles:
-            for child in self.rectangles_layer.childItems():
-                self.scene.removeItem(child)
-
-            for rect in self.rectangles:
-                rectItem = QGraphicsRectItem(rect)
-                rectItem.setPen(self.pen)
-                rectItem.setParentItem(self.rectangles_layer)
-
+            return [(scaledRect(self.rect(), scale, center=(0.5, self.horizont))) for scale in scales]
         except ZeroDivisionError:
-            self.scene.clear()
+            return []
+
+    def paint(self, painter, option, widget):
+        # draw base rect
+        painter.drawRect(self.rect())
+
+        for door in self.doors():
+            painter.drawRect(door)
+
+
+class Window(BaseWindow):
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+
+        self.corridorItem = CorridorItem()
+        self.corridorItem.setRect(0,0, 210, 297)
+        self.corridorItem.length = int(self.settings.value('length', 50))
+        self.corridorItem.count = int(self.settings.value('count', 50))
+        self.corridorItem.k = int(self.settings.value('k', 50))
+        self.corridorItem.horizont = int(self.settings.value('horizont', 50))/100
+
+        self.paper_rect = QRectF(0,0, 420*2, 594*2) #A2
+        self.pen = QPen(
+            QBrush(QColor(0,0,0)),
+            0.1, # width,
+            Qt.SolidLine,
+            Qt.SquareCap,
+            Qt.RoundJoin
+            )
+
+        # attributes
+        self.inspector.layout().addWidget(QLabel('length'))
+        def updateItemLength(val):
+            self.corridorItem.length = val
+            self.settings.setValue('length', val)
+            self.settings.sync()
+        self.lengthSlider = SliderLabel("length")
+        self.lengthSlider.setValue(self.corridorItem.length)
+        self.lengthSlider.valueChanged.connect(updateItemLength)
+        self.inspector.layout().addWidget(self.lengthSlider)
+
+        self.inspector.layout().addWidget(QLabel('count'))
+        def updateItemCount(val):
+            self.corridorItem.count = val*10
+            self.settings.setValue('count', val)
+            self.settings.sync()
+        self.countSlider = SliderLabel('count')
+        self.countSlider.setValue(self.corridorItem.count/10)
+        self.countSlider.valueChanged.connect(updateItemCount)
+        self.inspector.layout().addWidget(self.countSlider)
+
+        self.inspector.layout().addWidget(QLabel('k'))
+        def updateItemK(val):
+            self.corridorItem.k = val
+            self.settings.setValue('k', val)
+            self.settings.sync()
+        self.kSlider = SliderLabel('k')
+        self.kSlider.setValue(self.corridorItem.k)
+        self.kSlider.valueChanged.connect(updateItemK)
+        self.inspector.layout().addWidget(self.kSlider)
+
+        self.inspector.layout().addWidget(QLabel('horizont'))
+        def updateItemHorizont(val):
+            self.corridorItem.horizont = val/100
+            self.settings.setValue('horizont', val)
+            self.settings.sync()
+        self.horizontSlider = SliderLabel('horizont')
+        self.horizontSlider.setValue(self.corridorItem.horizont*100)
+        self.horizontSlider.valueChanged.connect(updateItemHorizont)
+        self.inspector.layout().addWidget(self.horizontSlider)
+
+        # paper
+        self.inspector.layout().addWidget(QLabel('paper'))
+        paper_selector = QComboBox()
+        paper_selector.addItem("A2")
+        paper_selector.addItem("A3")
+        paper_selector.addItem("A4")
+        paper_selector.addItem("A5")
+        self.inspector.layout().addWidget(paper_selector)
+        paperItem = QGraphicsRectItem(self.paper_rect)
+        paperItem.setBrush(QColor(255,255,255))
+        paperItem.setPen(QPen(Qt.NoPen))
+        paperItem.setZValue(-1)
+        self.scene.addItem(paperItem)
+
+        # actions
+        self.exportButton = QPushButton("export")
+        self.exportButton.clicked.connect(self.export)
+        self.inspector.layout().addWidget(self.exportButton)
+
+        self.packButton = QPushButton("pack")
+        self.packButton.clicked.connect(self.pack)
+        self.inspector.layout().addWidget(self.packButton)
+
+        def update_paper(i):
+            paper = paper_selector.itemText(i)
+            print("update paper item size", paper)
+            if paper == "A2":
+                self.paper_rect = QRectF(0,0, 420, 594)
+            if paper == "A3":
+                self.paper_rect = QRectF(0,0, 297, 420)
+            elif paper == "A4":
+                self.paper_rect = QRectF(0,0, 210, 297)
+            elif paper == "A5":
+                self.paper_rect = QRectF(0,0, 148, 210)
+
+            paperItem.setRect(self.paper_rect)
+        paper_selector.currentIndexChanged.connect(update_paper)
+        self.scene.addItem(self.corridorItem)
 
     def pack(self):
         import rectpack
         packer = rectpack.newPacker(rotation=False)
 
         # Add the rectangles to packing queue
-        for rect in self.rectangles:
+        for rect in self.corridorItem.doors():
             packer.add_rect( rect.width(), rect.height() )
 
-        # Add the bins where the rectangles will be placed
-        packer.add_bin(self.page_rect.width(), self.page_rect.height())
+        # Add the bins where the doors will be placed
+        packer.add_bin(self.paper_rect.width(), self.paper_rect.height())
 
         # Start packing
         packer.pack()
 
         # clear rectangles:
+        if not hasattr(self, 'rectangles_layer'):
+            self.rectangles_layer = QGraphicsLayerItem()
+            self.scene.addItem(self.rectangles_layer)
+
         for child in self.rectangles_layer.childItems():
             self.scene.removeItem(child)
 
         # add packed rectangles
         nbins = len(packer)
-        print(nbins)
+        print("number of bins:", nbins)
         for b in packer:
             for r in packer[0]:
                 rectItem = QGraphicsRectItem(r.x, r.y, r.width, r.height)
@@ -249,20 +314,23 @@ class Window(BaseWindow):
 
     def export(self):
         filename = "test.svg"
+
         generator = QSvgGenerator()
         generator.setFileName(filename)
-        #
-
-        generator.setDescription("paper: A4mm count: {} length:{} k:{} horizont: {}".format(self.count, self.length, self.k, self.horizont))
+        generator.setDescription("paper: A4mm count: {} length:{} k:{} horizont: {}".format(self.corridorItem.count, self.corridorItem.length, self.corridorItem.k, self.corridorItem.horizont))
         generator.setSize(QSize(400, 400))
         generator.setViewBox(QRect(0, 0, 400, 400))
+
         painter = QPainter()
         painter.begin(generator)
         self.scene.render(painter)
         painter.end()
 
-        import subprocess
-        subprocess.run(['open', filename], check=True)
+        try:
+            import subprocess
+            subprocess.run(['open', filename], check=True)
+        except FileNotFoundError as err:
+            print(err)
 
 if __name__ == "__main__":
     import sys, os
