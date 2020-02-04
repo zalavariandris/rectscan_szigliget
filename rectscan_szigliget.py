@@ -112,10 +112,6 @@ class QGraphicsLayerItem(QGraphicsItem):
 class CorridorItem(QGraphicsRectItem):
     def __init__(self, parent=None):
         super().__init__()
-        self.count = 20
-        self.length = 1000
-        self.k = 600
-        self.horizont = 0.5
 
     @property
     def length(self):
@@ -191,7 +187,11 @@ class Window(BaseWindow):
         self.corridorItem.k = int(self.settings.value('k', 50))
         self.corridorItem.horizont = int(self.settings.value('horizont', 50))/100
 
-        self.paper_rect = QRectF(0,0, 420*2, 594*2) #A2
+        self.paperItem = QGraphicsRectItem(0,0, 840, 1188) #A1
+        self.paperItem.setBrush(QColor(255,255,255))
+        self.paperItem.setPen(QPen(Qt.NoPen))
+        self.paperItem.setZValue(-1)
+        self.scene.addItem(self.paperItem)
         self.pen = QPen(
             QBrush(QColor(0,0,0)),
             0.1, # width,
@@ -200,7 +200,7 @@ class Window(BaseWindow):
             Qt.RoundJoin
             )
 
-        # attributes
+        # bind sliders to corridorItem
         self.inspector.layout().addWidget(QLabel('length'))
         def updateItemLength(val):
             self.corridorItem.length = val
@@ -241,19 +241,15 @@ class Window(BaseWindow):
         self.horizontSlider.valueChanged.connect(updateItemHorizont)
         self.inspector.layout().addWidget(self.horizontSlider)
 
-        # paper
+        # paper UI
         self.inspector.layout().addWidget(QLabel('paper'))
         paper_selector = QComboBox()
+        paper_selector.addItem("A1")
         paper_selector.addItem("A2")
         paper_selector.addItem("A3")
         paper_selector.addItem("A4")
         paper_selector.addItem("A5")
         self.inspector.layout().addWidget(paper_selector)
-        paperItem = QGraphicsRectItem(self.paper_rect)
-        paperItem.setBrush(QColor(255,255,255))
-        paperItem.setPen(QPen(Qt.NoPen))
-        paperItem.setZValue(-1)
-        self.scene.addItem(paperItem)
 
         # actions
         self.exportButton = QPushButton("export")
@@ -267,16 +263,17 @@ class Window(BaseWindow):
         def update_paper(i):
             paper = paper_selector.itemText(i)
             print("update paper item size", paper)
-            if paper == "A2":
-                self.paper_rect = QRectF(0,0, 420, 594)
+            if paper == "A1":
+                self.paperItem.setRect(0,0, 840, 1188)
+            elif paper == "A2":
+                self.paperItem.setRect(0,0, 420, 594)
             if paper == "A3":
-                self.paper_rect = QRectF(0,0, 297, 420)
+                self.paperItem.setRect(0,0, 297, 420)
             elif paper == "A4":
-                self.paper_rect = QRectF(0,0, 210, 297)
+                self.paperItem.setRect(0,0, 210, 297)
             elif paper == "A5":
-                self.paper_rect = QRectF(0,0, 148, 210)
+                self.paperItem.setRect(0,0, 148, 210)
 
-            paperItem.setRect(self.paper_rect)
         paper_selector.currentIndexChanged.connect(update_paper)
         self.scene.addItem(self.corridorItem)
 
@@ -289,7 +286,7 @@ class Window(BaseWindow):
             packer.add_rect( rect.width(), rect.height() )
 
         # Add the bins where the doors will be placed
-        packer.add_bin(self.paper_rect.width(), self.paper_rect.height())
+        packer.add_bin(self.paperItem.rect().width(), self.paperItem.rect().height())
 
         # Start packing
         packer.pack()
