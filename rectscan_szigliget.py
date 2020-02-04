@@ -14,6 +14,8 @@ class GraphicsViewport(QGraphicsView):
         for gesture in [Qt.TapGesture, Qt.TapAndHoldGesture, Qt.PanGesture, Qt.PinchGesture, Qt.SwipeGesture, Qt.CustomGesture]:
             self.grabGesture(gesture)
 
+        self.setBackgroundBrush(QBrush(QColor(240, 240, 240), Qt.SolidPattern));
+
     def event(self, event):
         if event.type() == QEvent.Gesture:
             return self.gestureEvent(event)
@@ -22,8 +24,9 @@ class GraphicsViewport(QGraphicsView):
     def gestureEvent(self, event):
         pinch = event.gesture(Qt.PinchGesture)
         if pinch:
-            print(pinch.scaleFactor())
-            self.scale(pinch.scaleFactor(), pinch.scaleFactor())
+            changeFlags = pinch.changeFlags()
+            if changeFlags & QPinchGesture.ScaleFactorChanged:
+                self.scale(pinch.scaleFactor(), pinch.scaleFactor())
         return True
 
     def wheelEvent(self, event):
@@ -100,9 +103,26 @@ class BaseWindow(QSplitter):
         return slider
 
 
+class QGraphicsLayerItem(QGraphicsItem):
+    pass
+
 class Window(BaseWindow):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
+
+        self.rectangles = []
+        self.baseRect = QRectF(0,0, 210, 297) #A4
+        self.page_rect = QRectF(0,0, 420*2, 594*2) #A2
+        self.pen = QPen(
+            QBrush(QColor(0,0,0)),
+            0.1, # width,
+            Qt.SolidLine,
+            Qt.SquareCap,
+            Qt.RoundJoin
+            )
+
+        # page setup
+
         # attributes
         self.addAttribute('length').valueChanged.connect(self.updateRectangles)
         self.addAttribute('count').valueChanged.connect(self.updateRectangles)
@@ -119,16 +139,36 @@ class Window(BaseWindow):
         self.inspector.layout().addWidget(self.packButton)
 
         #
-        self.rectangles = []
-        self.baseRect = QRectF(0,0, 210, 297) #A4
-        self.binRect = QRectF(0,0, 420*2, 594*2) #A2
-        self.pen = QPen(
-            QBrush(QColor(0,0,0)),
-            0.1, # width,
-            Qt.SolidLine,
-            Qt.SquareCap,
-            Qt.RoundJoin
-            )
+        self.rectangles_layer = QGraphicsLayerItem()
+        self.scene.addItem(self.rectangles_layer)
+
+        # page
+        page_selector = QComboBox()
+        page_selector.addItem("A2")
+        page_selector.addItem("A3")
+        page_selector.addItem("A4")
+        page_selector.addItem("A5")
+        self.inspector.layout().addWidget(page_selector)
+        pageItem = QGraphicsRectItem(self.page_rect)
+        pageItem.setBrush(QColor(255,255,255))
+        pageItem.setPen(QPen(Qt.NoPen))
+        pageItem.setZValue(-1)
+        self.scene.addItem(pageItem)
+
+        def update_page(i):
+            page = page_selector.itemText(i)
+            print("update page item size", page)
+            if page == "A2":
+                self.page_rect = QRectF(0,0, 420, 594)
+            if page == "A3":
+                self.page_rect = QRectF(0,0, 297, 420)
+            elif page == "A4":
+                self.page_rect = QRectF(0,0, 210, 297)
+            elif page == "A5":
+                self.page_rect = QRectF(0,0, 148, 210)
+
+            pageItem.setRect(self.page_rect)
+        page_selector.currentIndexChanged.connect(update_page)
 
         # init rectangles
         self.updateRectangles()
@@ -166,11 +206,15 @@ class Window(BaseWindow):
         try:
             scales = [1/(1+distance/self.count*self.length/self.k) for distance in range(self.count)]
             self.rectangles = [(scaledRect(self.baseRect, scale, center=(0.5, self.horizont))) for scale in scales]
-            self.scene.clear()
+
+            # clear rectangles:
+            for child in self.rectangles_layer.childItems():
+                self.scene.removeItem(child)
+
             for rect in self.rectangles:
                 rectItem = QGraphicsRectItem(rect)
                 rectItem.setPen(self.pen)
-                self.scene.addItem(rectItem)
+                rectItem.setParentItem(self.rectangles_layer)
 
         except ZeroDivisionError:
             self.scene.clear()
@@ -184,24 +228,24 @@ class Window(BaseWindow):
             packer.add_rect( rect.width(), rect.height() )
 
         # Add the bins where the rectangles will be placed
-        packer.add_bin(self.binRect.width(), self.binRect.height())
+        packer.add_bin(self.page_rect.width(), self.page_rect.height())
 
         # Start packing
         packer.pack()
 
-        # add to scene
-        self.scene.clear()
+        # clear rectangles:
+        for child in self.rectangles_layer.childItems():
+            self.scene.removeItem(child)
+
+        # add packed rectangles
         nbins = len(packer)
         print(nbins)
         for b in packer:
-            binItem = QGraphicsRectItem(0,0,b.width, b.height)
-            binItem.setPen(QColor(255,0,0))
-            self.scene.addItem(binItem)
             for r in packer[0]:
                 rectItem = QGraphicsRectItem(r.x, r.y, r.width, r.height)
                 # rectItem.setPen(self.pen)
                 # rectItem.setBrush(QColor(128, 128, 128, 10))
-                self.scene.addItem(rectItem)
+                rectItem.setParentItem(self.rectangles_layer)
 
     def export(self):
         filename = "test.svg"
