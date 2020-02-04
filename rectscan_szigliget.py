@@ -4,7 +4,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtSvg import QSvgGenerator
 import threading
 
-
+# WIDGETS
 class GraphicsViewport(QGraphicsView):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -73,6 +73,7 @@ class SliderLabel(QWidget):
         self.valueChanged.emit(value)
 
 
+# BASE WINDOW with Inspector
 class BaseWindow(QSplitter):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -101,6 +102,7 @@ class BaseWindow(QSplitter):
         return QSize(1024, 768)
 
 
+# GRAPHICS ITEMS
 class QGraphicsLayerItem(QGraphicsItem):
     def boundingRect(self):
         return self.childrenBoundingRect()
@@ -184,6 +186,7 @@ class PaperItem(QGraphicsRectItem):
         self.setZValue(-1)
 
 
+# MAIN APP WINDOW
 class Window(BaseWindow):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
