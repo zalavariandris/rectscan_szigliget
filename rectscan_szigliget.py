@@ -176,6 +176,14 @@ class CorridorItem(QGraphicsRectItem):
             painter.drawRect(door)
 
 
+class PaperItem(QGraphicsRectItem):
+    def __init__(self, x, y, w, h):
+        super().__init__(x, y, w, h)
+        self.setBrush(QColor(255,255,255))
+        self.setPen(QPen(Qt.NoPen))
+        self.setZValue(-1)
+
+
 class Window(BaseWindow):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -187,18 +195,8 @@ class Window(BaseWindow):
         self.corridorItem.k = int(self.settings.value('k', 50))
         self.corridorItem.horizont = int(self.settings.value('horizont', 50))/100
 
-        self.paperItem = QGraphicsRectItem(0,0, 840, 1188) #A1
-        self.paperItem.setBrush(QColor(255,255,255))
-        self.paperItem.setPen(QPen(Qt.NoPen))
-        self.paperItem.setZValue(-1)
+        self.paperItem = PaperItem(0,0, 840, 1188) #A1
         self.scene.addItem(self.paperItem)
-        self.pen = QPen(
-            QBrush(QColor(0,0,0)),
-            0.1, # width,
-            Qt.SolidLine,
-            Qt.SquareCap,
-            Qt.RoundJoin
-            )
 
         # bind sliders to corridorItem
         def updateItemLength(val):
@@ -301,8 +299,6 @@ class Window(BaseWindow):
         for b in packer:
             for r in packer[0]:
                 rectItem = QGraphicsRectItem(r.x, r.y, r.width, r.height)
-                # rectItem.setPen(self.pen)
-                # rectItem.setBrush(QColor(128, 128, 128, 10))
                 rectItem.setParentItem(self.rectangles_layer)
 
     def export(self):
