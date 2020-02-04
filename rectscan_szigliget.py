@@ -201,7 +201,6 @@ class Window(BaseWindow):
             )
 
         # bind sliders to corridorItem
-        self.inspector.layout().addWidget(QLabel('length'))
         def updateItemLength(val):
             self.corridorItem.length = val
             self.settings.setValue('length', val)
@@ -211,7 +210,6 @@ class Window(BaseWindow):
         self.lengthSlider.valueChanged.connect(updateItemLength)
         self.inspector.layout().addWidget(self.lengthSlider)
 
-        self.inspector.layout().addWidget(QLabel('count'))
         def updateItemCount(val):
             self.corridorItem.count = val*10
             self.settings.setValue('count', val)
@@ -221,7 +219,6 @@ class Window(BaseWindow):
         self.countSlider.valueChanged.connect(updateItemCount)
         self.inspector.layout().addWidget(self.countSlider)
 
-        self.inspector.layout().addWidget(QLabel('k'))
         def updateItemK(val):
             self.corridorItem.k = val
             self.settings.setValue('k', val)
@@ -231,7 +228,6 @@ class Window(BaseWindow):
         self.kSlider.valueChanged.connect(updateItemK)
         self.inspector.layout().addWidget(self.kSlider)
 
-        self.inspector.layout().addWidget(QLabel('horizont'))
         def updateItemHorizont(val):
             self.corridorItem.horizont = val/100
             self.settings.setValue('horizont', val)
