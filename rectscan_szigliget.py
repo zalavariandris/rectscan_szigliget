@@ -186,8 +186,7 @@ class PaperItem(QGraphicsRectItem):
         self.setZValue(-1)
 
 
-# MAIN APP WINDOW
-
+# QtThread pool helpers
 class WorkerSignals(QObject):
     finished = pyqtSignal()
     error = pyqtSignal(tuple)
@@ -202,9 +201,7 @@ class Worker(QRunnable):
         self.args = args
         self.kwargs = kwargs
         self.signals = WorkerSignals()
-
         # self.kwargs['progress_callback'] = self.signals.progress
-
 
     @pyqtSlot()
     def run(self):
@@ -221,6 +218,7 @@ class Worker(QRunnable):
             self.signals.finished.emit()
 
 
+# MAIN APP WINDOW
 class Window(BaseWindow):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
