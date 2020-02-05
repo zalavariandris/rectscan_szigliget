@@ -187,6 +187,40 @@ class PaperItem(QGraphicsRectItem):
 
 
 # MAIN APP WINDOW
+
+class WorkerSignals(QObject):
+    finished = pyqtSignal()
+    error = pyqtSignal(tuple)
+    result = pyqtSignal(object)
+    progress = pyqtSignal(int)
+
+class Worker(QRunnable):
+    def __init__(self, fn, *args, **kwargs):
+        super().__init__()
+
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+        self.signals = WorkerSignals()
+
+        # self.kwargs['progress_callback'] = self.signals.progress
+
+
+    @pyqtSlot()
+    def run(self):
+        import traceback
+        try:
+            result = self.fn(*self.args, **self.kwargs)
+        except:
+            traceback.print_exc()
+            exctype, value = sys.exc_info()[:2]
+            self.signals.error.emit((exctype, value, traceback.format_exc()))
+        else:
+            self.signals.result.emit(result)
+        finally:
+            self.signals.finished.emit()
+
+
 class Window(BaseWindow):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -253,9 +287,11 @@ class Window(BaseWindow):
         self.exportButton.clicked.connect(self.export)
         self.inspector.layout().addWidget(self.exportButton)
 
-        self.packButton = QPushButton("pack")
-        self.packButton.clicked.connect(self.pack)
-        self.inspector.layout().addWidget(self.packButton)
+        self.packAsyncButton = QPushButton("pack")
+        self.packAsyncButton.clicked.connect(self.packAsync)
+        self.inspector.layout().addWidget(self.packAsyncButton)
+
+        self.packer = None
 
         def update_paper(i):
             paper = paper_selector.itemText(i)
@@ -274,35 +310,44 @@ class Window(BaseWindow):
         paper_selector.currentIndexChanged.connect(update_paper)
         self.scene.addItem(self.corridorItem)
 
-    def pack(self):
+    @staticmethod
+    def pack(doors:[QRectF], paper:QRectF)->[QRectF]:
         import rectpack
         packer = rectpack.newPacker(rotation=False)
+        for door in doors:
+            packer.add_rect(door.width(), door.height())
 
-        # Add the rectangles to packing queue
-        for rect in self.corridorItem.doors():
-            packer.add_rect( rect.width(), rect.height() )
-
-        # Add the bins where the doors will be placed
-        packer.add_bin(self.paperItem.rect().width(), self.paperItem.rect().height())
-
-        # Start packing
+        packer.add_bin(paper.width(), paper.height())
         packer.pack()
 
-        # clear rectangles:
-        if not hasattr(self, 'rectangles_layer'):
-            self.rectangles_layer = QGraphicsLayerItem()
-            self.scene.addItem(self.rectangles_layer)
+        rectangles = []
+        for r in packer[0]:
+            rectangles.append(QRectF(r.x, r.y, r.width, r.height))
+        return rectangles
 
-        for child in self.rectangles_layer.childItems():
-            self.scene.removeItem(child)
+    def packAsync(self):
+        worker = Worker(self.pack, self.corridorItem.doors(), self.paperItem.rect())
 
-        # add packed rectangles
-        nbins = len(packer)
-        print("number of bins:", nbins)
-        for b in packer:
-            for r in packer[0]:
-                rectItem = QGraphicsRectItem(r.x, r.y, r.width, r.height)
+        def onResult(result):
+            # clear rectangles:
+            if not hasattr(self, 'rectangles_layer'):
+                self.rectangles_layer = QGraphicsLayerItem()
+                self.scene.addItem(self.rectangles_layer)
+
+            for child in self.rectangles_layer.childItems():
+                self.scene.removeItem(child)
+
+            for door in result:
+                rectItem = QGraphicsRectItem(door)
                 rectItem.setParentItem(self.rectangles_layer)
+
+        worker.signals.result.connect(onResult)
+
+        def onFinished():
+            print("finished")
+        worker.signals.finished.connect(onFinished)
+
+        QThreadPool.globalInstance().start(worker)
 
     def export(self):
         filename = "test.svg"
